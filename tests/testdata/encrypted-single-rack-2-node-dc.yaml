@@ -5,10 +5,14 @@ metadata:
 spec:
   clusterName: cluster2
   serverType: cassandra
-  serverVersion: "3.11.10"
+  serverVersion: "4.0.8"
   managementApiAuth:
     insecure: {}
-  size: 2
+  size: 3
+  tls:
+    mutual: true
+    issuer: cass-operator-internode-issuer
+    internode: true
   storageConfig:
       cassandraDataVolumeClaimSpec:
         storageClassName: standard
@@ -19,14 +23,23 @@ spec:
             storage: 1Gi
   racks:
     - name: r1
+  # podTemplateSpec:
+  #   spec:
+      # containers:
+      #   - name: cassandra
+      # initContainers:
+      #   - args: ["/bin/sh", "-c", "cp /tls/ca.crt /etc/ssl/java/cacerts"]
+      #     image: busybox
+      #     imagePullPolicy: "Always"
+      #     name: "ca-importer"
   config:
-    jvm-options:
+    jvm-server-options:
       initial_heap_size: "512m"
       max_heap_size: "512m"
-    cassandra-yaml:
-      server_encryption_options:
-        internode_encryption: all
-        keystore: /etc/encryption/node-keystore.jks
-        keystore_password: dc2
-        truststore: /etc/encryption/node-keystore.jks
-        truststore_password: dc2
+    # cassandra-yaml:
+    #   server_encryption_options:
+    #     internode_encryption: all
+    #     keystore: /etc/encryption/node-keystore.jks
+    #     keystore_password: dc2
+    #     truststore: /etc/encryption/node-keystore.jks
+    #     truststore_password: dc2

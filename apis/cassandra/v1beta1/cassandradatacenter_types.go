@@ -131,6 +131,8 @@ type CassandraDatacenterSpec struct {
 	// that an update to the secret will trigger an update of the StatefulSets.
 	ConfigSecret string `json:"configSecret,omitempty"`
 
+	TLS *TLSConfig `json:"tls,omitempty"`
+
 	// Config for the Management API certificates
 	ManagementApiAuth ManagementApiAuthConfig `json:"managementApiAuth,omitempty"`
 
@@ -230,7 +232,7 @@ type CassandraDatacenterSpec struct {
 	// Tolerations applied to the Cassandra pod. Note that these cannot be overridden with PodTemplateSpec.
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Additional Labels allows to define additional labels that will be included in all objects created by the operator. Note, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
+	// AdditionalLabels allows to define additional labels that will be included in all objects created by the operator. Note, user can override values set by default from the cass-operator and doing so could break cass-operator functionality.
 	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
 
 	// CDC allows configuration of the change data capture agent which can run within the Management API container. Use it to send data to Pulsar.
@@ -317,6 +319,19 @@ func (dc *CassandraDatacenter) GetRack(rackName string) Rack {
 	return Rack{
 		Name: "default",
 	}
+}
+
+// TLSConfig allows to configure mTLS connections for internode as well as operator<->node communication. Experimental.
+type TLSConfig struct {
+	// Issuer is required for cert-manager integration
+	Issuer string `json:"issuer,omitempty"`
+
+	// TODO Make proper structure - this is not final format
+
+	Mutual bool `json:"mutual,omitempty"`
+
+	// Internode if set to true automatically sets internode encryption between nodes.
+	Internode bool `json:"internode,omitempty"`
 }
 
 // ServiceConfig defines additional service configurations.
@@ -713,6 +728,8 @@ func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 		internodeSSL = dc.Spec.Networking.NodePort.InternodeSSL
 	}
 
+	internodeSSLEnabled := dc.Spec.TLS != nil && dc.Spec.TLS.Internode
+
 	modelValues := serverconfig.GetModelValues(
 		seeds,
 		dc.Spec.ClusterName,
@@ -723,7 +740,8 @@ func (dc *CassandraDatacenter) GetConfigAsJSON(config []byte) (string, error) {
 		native,
 		nativeSSL,
 		internode,
-		internodeSSL)
+		internodeSSL,
+		internodeSSLEnabled)
 
 	var modelBytes []byte
 

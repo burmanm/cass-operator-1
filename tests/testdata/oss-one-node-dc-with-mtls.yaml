@@ -9,7 +9,7 @@ spec:
   managementApiAuth:
     manual:
       clientSecretName: mgmt-api-client-credentials
-      serverSecretName: mgmt-api-server-credentials    
+      serverSecretName: mgmt-api-server-credentials
   size: 1
   storageConfig:
     cassandraDataVolumeClaimSpec:

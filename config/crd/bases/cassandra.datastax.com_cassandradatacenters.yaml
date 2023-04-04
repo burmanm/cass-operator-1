@@ -42,10 +42,10 @@ spec:
               additionalLabels:
                 additionalProperties:
                   type: string
-                description: Additional Labels allows to define additional labels
-                  that will be included in all objects created by the operator. Note,
-                  user can override values set by default from the cass-operator and
-                  doing so could break cass-operator functionality.
+                description: AdditionalLabels allows to define additional labels that
+                  will be included in all objects created by the operator. Note, user
+                  can override values set by default from the cass-operator and doing
+                  so could break cass-operator functionality.
                 type: object
               additionalSeeds:
                 items:
@@ -10582,6 +10582,20 @@ spec:
                       it defaults to Limits if that is explicitly specified, otherwise
                       to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
+                type: object
+              tls:
+                description: TLSConfig allows to configure mTLS connections for internode
+                  as well as operator<->node communication. Experimental.
+                properties:
+                  internode:
+                    description: Internode if set to true automatically sets internode
+                      encryption between nodes.
+                    type: boolean
+                  issuer:
+                    description: Issuer is required for cert-manager integration
+                    type: string
+                  mutual:
+                    type: boolean
                 type: object
               tolerations:
                 description: Tolerations applied to the Cassandra pod. Note that these

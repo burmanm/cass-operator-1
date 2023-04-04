@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 
 	"github.com/pkg/errors"
 
@@ -328,6 +329,34 @@ func addVolumes(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTemplateSpe
 		}
 	}
 
+	if dc.Spec.TLS.Mutual {
+		// Add certs..
+		readOnly := true
+		encryptionVolume := corev1.Volume{
+			Name: "encryption-new",
+			VolumeSource: corev1.VolumeSource{
+				CSI: &corev1.CSIVolumeSource{
+					Driver:   "csi.cert-manager.io",
+					ReadOnly: &readOnly,
+					VolumeAttributes: map[string]string{
+
+						"csi.cert-manager.io/pkcs12-enable":   "true",
+						"csi.cert-manager.io/pkcs12-filename": "node-keystore.p12",
+						"csi.cert-manager.io/pkcs12-password": "changeit",
+
+						"csi.cert-manager.io/key-usages":  "server auth,client auth",
+						"csi.cert-manager.io/common-name": "${SERVICE_ACCOUNT_NAME}.${POD_NAMESPACE}",
+
+						"csi.cert-manager.io/issuer-name": dc.Spec.TLS.Issuer,
+						"csi.cert-manager.io/fs-group":    strconv.Itoa(int(*baseTemplate.Spec.SecurityContext.FSGroup)),
+						"csi.cert-manager.io/dns-names":   "${POD_NAME}.${POD_NAMESPACE}.svc.cluster.local",
+					},
+				},
+			},
+		}
+		volumeDefaults = append(volumeDefaults, encryptionVolume)
+	}
+
 	volumeDefaults = combineVolumeSlices(
 		volumeDefaults, baseTemplate.Spec.Volumes)
 
@@ -578,6 +607,14 @@ func buildContainers(dc *api.CassandraDatacenter, baseTemplate *corev1.PodTempla
 		MountPath: "/config",
 	}
 	volumeDefaults = append(volumeDefaults, serverCfgMount)
+
+	if dc.Spec.TLS.Mutual {
+		encryptionVolumeMount := corev1.VolumeMount{
+			Name:      "encryption-new",
+			MountPath: "/tls",
+		}
+		volumeDefaults = append(volumeDefaults, encryptionVolumeMount)
+	}
 
 	cassServerLogsMount := corev1.VolumeMount{
 		Name:      "server-logs",

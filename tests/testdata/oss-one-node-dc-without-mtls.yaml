@@ -5,10 +5,13 @@ metadata:
 spec:
   clusterName: cluster1
   serverType: cassandra
-  serverVersion: "4.0.4"
+  serverVersion: "4.0.8"
   managementApiAuth:
     insecure: {}
   size: 1
+  tls:
+    mutual: true
+    issuer: cass-operator-internode-issuer
   storageConfig:
     cassandraDataVolumeClaimSpec:
       storageClassName: standard

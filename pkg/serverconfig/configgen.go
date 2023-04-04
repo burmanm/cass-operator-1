@@ -21,7 +21,8 @@ func GetModelValues(
 	nativePort int,
 	nativeSSLPort int,
 	internodePort int,
-	internodeSSLPort int) NodeConfig {
+	internodeSSLPort int,
+	internodeSSLEnabled bool) NodeConfig {
 
 	seedsString := strings.Join(seeds, ",")
 
@@ -50,6 +51,20 @@ func GetModelValues(
 		modelValues["cassandra-yaml"].(NodeConfig)["ssl_storage_port"] = internodeSSLPort
 	} else if internodePort != 0 {
 		modelValues["cassandra-yaml"].(NodeConfig)["storage_port"] = internodePort
+	}
+
+	if internodeSSLEnabled {
+		// Keystore/Truststore passwords are not intended to be secure. changeit is the default password for all Java keystores.
+		// https://github.com/cert-manager/csi-driver/pull/103#issuecomment-1188862117
+		serverEncryptionOptions := NodeConfig{
+			"internode_encryption": "all",
+			"keystore":             "/tls/node-keystore.p12",
+			"keystore_password":    "changeit",
+			"truststore":           "/tls/node-keystore.p12",
+			"truststore_password":  "changeit",
+			"store_type":           "PKCS12",
+		}
+		modelValues["cassandra-yaml"].(NodeConfig)["server_encryption_options"] = serverEncryptionOptions
 	}
 
 	return modelValues
