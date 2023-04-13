@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pavlo-v-chernykh/keystore-go/v4"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -36,7 +37,7 @@ const (
 	KeyStoreKey   = "keystore.jks"
 )
 
-var password = []byte{'c', 'h', 'a', 'n', 'g', 'e', 'm', 'e'}
+var password = []byte{'c', 'h', 'a', 'n', 'g', 'e', 'i', 't'}
 
 // func readKeystoresFromSecret(secret *corev1.Secret) (keystore.KeyStore, keystore.KeyStore) {
 // 	/*
@@ -55,6 +56,8 @@ func createTrustStoreFromSecret(secret *corev1.Secret) (keystore.KeyStore, error
 	if err != nil {
 		return ks, err
 	}
+
+	// TODO We need to have both old CA and new CA in this file as well (if there's two)
 
 	for i, cert := range certs {
 		if err := ks.SetTrustedCertificateEntry(fmt.Sprintf("ts-alias-%d", i), keystore.TrustedCertificateEntry{
@@ -110,6 +113,17 @@ func createKeyStoreFromSecret(secret *corev1.Secret) (keystore.KeyStore, error) 
 	if p == nil {
 		return ks, fmt.Errorf("unable to decode tls.key")
 	}
+
+	if p.Type != "PRIVATE KEY" {
+		return ks, fmt.Errorf("provided private key is not a correct type of private key (PKCS8)")
+	}
+
+	_, err = x509.ParsePKCS8PrivateKey(p.Bytes)
+	if err != nil {
+		return ks, errors.Wrap(err, "unable to parse private key in PKCS#8 format")
+	}
+
+	// PKCS8 validation
 
 	ks.SetPrivateKeyEntry("private", keystore.PrivateKeyEntry{
 		CreationTime:     time.Now(), // TODO Should this be in the Secret?
