@@ -37,13 +37,32 @@ const (
 	KeyStoreKey   = "keystore.jks"
 )
 
-var password = []byte{'c', 'h', 'a', 'n', 'g', 'e', 'i', 't'}
+func readKeystoresFromSecret(secret *corev1.Secret) (keystore.KeyStore, keystore.KeyStore, error) {
+	ks := keystore.New()
+	ts := keystore.New()
 
-// func readKeystoresFromSecret(secret *corev1.Secret) (keystore.KeyStore, keystore.KeyStore) {
-// 	/*
-// 		Or just compare to existing one?
-// 	*/
-// }
+	b, found := secret.Data[KeyStoreKey]
+	if !found {
+		return ks, ts, fmt.Errorf("unable to find ca.crt from the target secret")
+	}
+
+	r := bytes.NewReader(b)
+	if err := ks.Load(r, readPassword(secret)); err != nil {
+		return ks, ts, err
+	}
+
+	bt, found := secret.Data[TrustStoreKey]
+	if !found {
+		return ks, ts, fmt.Errorf("unable to find ca.crt from the target secret")
+	}
+
+	rt := bytes.NewReader(bt)
+	if err := ts.Load(rt, readPassword(secret)); err != nil {
+		return ks, ts, err
+	}
+
+	return ks, ts, nil
+}
 
 func createTrustStoreFromSecret(secret *corev1.Secret) (keystore.KeyStore, error) {
 	ks := keystore.New()
@@ -123,15 +142,18 @@ func createKeyStoreFromSecret(secret *corev1.Secret) (keystore.KeyStore, error) 
 		return ks, errors.Wrap(err, "unable to parse private key in PKCS#8 format")
 	}
 
-	// PKCS8 validation
-
 	ks.SetPrivateKeyEntry("private", keystore.PrivateKeyEntry{
 		CreationTime:     time.Now(), // TODO Should this be in the Secret?
 		PrivateKey:       p.Bytes,
 		CertificateChain: certs,
-	}, password)
+	}, readPassword(secret))
 
 	return ks, nil
+}
+
+func readPassword(secret *corev1.Secret) []byte {
+	// TODO Stub
+	return []byte{'c', 'h', 'a', 'n', 'g', 'e', 'i', 't'}
 }
 
 func tsUpdateNeeded() bool {
@@ -141,14 +163,18 @@ func tsUpdateNeeded() bool {
 
 func writeKeystoresToSecret(ks keystore.KeyStore, ts keystore.KeyStore, secret *corev1.Secret) error {
 	ksBuffer := bytes.Buffer{}
-	if err := ks.Store(&ksBuffer, password); err != nil {
+	if err := ks.Store(&ksBuffer, readPassword(secret)); err != nil {
 		return err
+	}
+
+	if secret.Data == nil {
+		secret.Data = make(map[string][]byte)
 	}
 
 	secret.Data[KeyStoreKey] = ksBuffer.Bytes()
 
 	tsBuffer := bytes.Buffer{}
-	if err := ts.Store(&tsBuffer, password); err != nil {
+	if err := ts.Store(&tsBuffer, readPassword(secret)); err != nil {
 		return err
 	}
 
@@ -166,7 +192,11 @@ func removeExpired(ks keystore.KeyStore, cutTime time.Time) error {
 			}
 
 			cert, err := x509.ParseCertificate(tce.Certificate.Content)
-			// We allow certificates which are not yet valid - but might be in the future
+			if err != nil {
+				return err
+			}
+
+			// We allow certificates which are not yet valid
 			if cutTime.After(cert.NotAfter) {
 				ks.DeleteEntry(k)
 			}

@@ -1,7 +1,9 @@
 package secrets
 
 import (
+	"crypto/x509"
 	"testing"
+	"time"
 
 	"github.com/k8ssandra/cass-operator/pkg/generated/clientset/versioned/scheme"
 	"github.com/stretchr/testify/require"
@@ -48,15 +50,90 @@ func getSecret() (*corev1.Secret, error) {
 }
 
 func TestKeyStoreCreation(t *testing.T) {
+	require := require.New(t)
 	s, err := getSecret()
-	require.NoError(t, err)
+	require.NoError(err)
 
 	ks, err := createKeyStoreFromSecret(s)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	ts, err := createTrustStoreFromSecret(s)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.True(t, len(ks.Aliases()) >= 1)
-	require.True(t, len(ts.Aliases()) >= 1)
+	// TODO Add more checks
+	require.True(len(ks.Aliases()) >= 1)
+	require.True(len(ts.Aliases()) >= 1)
+}
+
+func TestKeyStoreWrite(t *testing.T) {
+	require := require.New(t)
+	s, err := getSecret()
+	require.NoError(err)
+
+	ks, err := createKeyStoreFromSecret(s)
+	require.NoError(err)
+
+	ts, err := createTrustStoreFromSecret(s)
+	require.NoError(err)
+
+	secret := &corev1.Secret{}
+	err = writeKeystoresToSecret(ks, ts, secret)
+	require.NoError(err)
+
+	require.NotNil(secret.Data[KeyStoreKey])
+	require.NotNil(secret.Data[TrustStoreKey])
+}
+
+func TestKeyStoreReadWrite(t *testing.T) {
+	require := require.New(t)
+	s, err := getSecret()
+	require.NoError(err)
+
+	ks, err := createKeyStoreFromSecret(s)
+	require.NoError(err)
+
+	ts, err := createTrustStoreFromSecret(s)
+	require.NoError(err)
+
+	secret := &corev1.Secret{}
+	err = writeKeystoresToSecret(ks, ts, secret)
+	require.NoError(err)
+
+	ks2, ts2, err := readKeystoresFromSecret(secret)
+	require.NoError(err)
+
+	require.EqualValues(ks.Aliases(), ks2.Aliases())
+	require.EqualValues(ts.Aliases(), ts2.Aliases())
+}
+
+func TestExpiry(t *testing.T) {
+	require := require.New(t)
+	s, err := getSecret()
+	require.NoError(err)
+
+	ks, err := createKeyStoreFromSecret(s)
+	require.NoError(err)
+
+	var validTime time.Time
+	for _, k := range ks.Aliases() {
+		if ks.IsTrustedCertificateEntry(k) {
+			tce, err := ks.GetTrustedCertificateEntry(k)
+			require.NoError(err)
+
+			cert, err := x509.ParseCertificate(tce.Certificate.Content)
+			require.NoError(err)
+			validTime = cert.NotAfter
+		}
+	}
+
+	startLen := len(ks.Aliases())
+	require.True(startLen > 0)
+
+	removeExpired(ks, validTime.Add(-1*time.Minute))
+	endLen := len(ks.Aliases())
+	require.Equal(startLen, endLen)
+
+	removeExpired(ks, validTime.Add(1*time.Minute))
+	endLen = len(ks.Aliases())
+	require.True(startLen > endLen)
 }
