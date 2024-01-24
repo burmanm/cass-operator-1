@@ -85,6 +85,11 @@ func (e *EndpointState) HasStatus(status EndpointStateStatus) bool {
 	return strings.HasPrefix(e.Status, string(status)) || strings.HasPrefix(e.StatusWithPort, string(status))
 }
 
+func (e *EndpointState) HasNoStatus() bool {
+	// Node is gone from the ring if it has no status - or there's a connectivity issue
+	return e.Status == "" && e.StatusWithPort == ""
+}
+
 func (x *EndpointState) GetRpcAddress() string {
 	if x.NativeAddressAndPort != "" {
 		// Cassandra 4.0+

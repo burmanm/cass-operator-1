@@ -288,7 +288,7 @@ func IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoi
 	for idx := range epData.Entity {
 		ep := &epData.Entity[idx]
 		if ep.GetRpcAddress() == pod.Status.PodIP || ep.EndpointIP == pod.Status.PodIP {
-			return ep.HasStatus(httphelper.StatusLeft)
+			return ep.HasStatus(httphelper.StatusLeft) || ep.HasNoStatus()
 		}
 	}
 
@@ -297,7 +297,7 @@ func IsDoneDecommissioning(pod *corev1.Pod, epData httphelper.CassMetadataEndpoi
 		for idx := range epData.Entity {
 			ep := &epData.Entity[idx]
 			if ep.HostID == nodeStatus.HostID {
-				return ep.HasStatus(httphelper.StatusLeft)
+				return ep.HasStatus(httphelper.StatusLeft) || ep.HasNoStatus()
 			}
 		}
 	}
